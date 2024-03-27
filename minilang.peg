@@ -1,0 +1,19 @@
+start          <- statement*
+
+statement      <- (assignment / expression) ';'?
+
+assignment     <- identifier '=' expression
+
+expression     <- term (addition / subtraction)*
+
+term           <- factor (multiplication / division)*
+
+factor         <- '(' expression ')' / number / identifier
+
+addition       <- '+' term
+subtraction    <- '-' term
+multiplication <- '*' factor
+division       <- '/' factor
+
+number         <- [0-9]+
+identifier     <- [a-zA-Z][a-zA-Z_]*

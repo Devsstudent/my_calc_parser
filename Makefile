@@ -8,7 +8,7 @@ NAME = my_calc
 all : $(NAME)
 
 $(NAME): $(OBJ)
-	$(CC) $(FLAG) -I $(HEAD) -I /opt/homebrew/include/criterion/ -L /opt/homebrew/cellar/criterion/2.4.2/lib/ -lcriterion $(OBJ) -o $(NAME)
+	$(CC) $(FLAG) -I $(HEAD) $(OBJ) -o $(NAME)
 
 obj/%.o: src/%.c | object
 	$(CC) $(FLAG) -I $(HEAD) -c $< -o $@
