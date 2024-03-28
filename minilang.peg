@@ -17,3 +17,9 @@ division       <- '/' factor
 
 number         <- [0-9]+
 identifier     <- [a-zA-Z][a-zA-Z_]*
+
+Expr    ← Sum
+Sum     ← Product (('+' / '-') Product)*
+Product ← Power (('*' / '/') Power)*
+Power   ← Value ('^' Power)?
+Value   ← [0-9]+ / '(' Expr ')'

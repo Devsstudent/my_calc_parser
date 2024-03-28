@@ -32,10 +32,12 @@ typedef struct expression {
 	bool		wasNumber;
 	bool		wasSymbol;
 	bool		wasVar;
+	bool		wasParenthese;
+	int			maxLayer;
 }	t_expression;
 
 typedef struct content {
-	int value;
+	float value;
 	char *content;
 }	t_content;
 
@@ -50,14 +52,14 @@ typedef struct leaf {
 struct def_list
 {
     const char      *name;
-    long int        val;
+    float	        val;
     struct def_list *next;
 };
 
 struct scope
 {
     struct def_list     *defs;
-    long int            current_val;
+    float            current_val;
 	struct leaf			*tree;
 	t_expression		*current_expr;
 };
@@ -65,5 +67,6 @@ struct scope
 
 int     my_calc(struct parser *p, struct scope *s);
 int read_space(struct parser *p);
+bool	parse_current_expr(struct scope *s, char *line, int i, int layer);
 
 #endif /* _MY_CALC_H */

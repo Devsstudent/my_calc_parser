@@ -110,17 +110,45 @@ t_leaf *new_leaf(t_content *content, t_leaf_type type){
 	return (leaf);
 }
 
-bool push_to_def(struct scope *s, char *name, int value){
-	(void) s;
+bool push_to_def(struct scope *s, char *name, float value){
 	struct def_list *var = calloc(1, sizeof(struct def_list));
-	if (!var){
+	if (!var || !s){
 		return (false);
 	}
-
+	
 	var->name = name;
 	var->val = value;
 	var->next = NULL;
+	
+	if (!s->defs){
+		s->defs = var;
+		return (true);
+	}
+	
+	struct def_list *buf = s->defs;
+
+	while (buf->next) {
+		buf = buf->next;
+	}
+	buf->next = var;
 	return true;
+}
+
+bool get_var_from_def_list(struct scope *s, char *name, float *gotVal){
+
+	if (!s){
+		return (false);
+	}
+	struct def_list *buf = s->defs;
+
+	while (buf){
+		if (strcmp(buf->name, name) == 0){
+			*gotVal = buf->val;
+			return (true);
+		}
+		buf = buf->next;
+	}
+	return (false);
 }
 
 //Get from def variable
@@ -316,37 +344,6 @@ bool is_expression(struct parser *p) {
 	return (false);
 }
 
-bool doAssignement(struct parser *p, struct capture_list *node, struct scope *s)
-{
-	(void) s;
-	char *var_name;
-
-	p->current_pos = node->begin;
-	if (read_var(p)) {
-		var_name = get_var_name(p, node, p->current_pos - node->begin);
-		printf("we have a var %s\n", var_name);
-		if (read_space(p) || read_assign_symbol(p)){
-			//Do Calc
-		}
-	}
-	else
-	{
-		return (false);
-	}
-
-/*
-	&& (read_assign_symbol(p) || (read_space(p) || read_assign_symbol(p)))
-	&& (read_int(p) \
-		|| read_var(p) \
-		|| read_basic_symbol(p) \
-		|| read_priority_symbol(p) \
-		|| read_space(p))\)
-	{
-		return (true);
-	}
-*/
-	return (false);
-}
 
 /*
 bool doCalc(struct parser *p, struct capture_list *node, struct scope *s){
@@ -384,6 +381,12 @@ bool issymbol(char a){
 	return (false);
 }
 
+bool isvar(char a){
+	if (isalpha(a) || a == '_')
+		return (true);
+	return (false);
+}
+
 bool isValidNextToNumber(char a){
 	if (issymbol(a) || isspace(a) || a == ';')
 		return (true);
@@ -417,18 +420,19 @@ bool get_symbol(int *layer, int *i, struct scope *s, char *line){
 		if (!add_block_to_expression(s->current_expr, new_block(DIV, value, *layer)))
 			return (false);
 	}
-	else if (line[*i] == '*'){
+	else if (line[*i] == '*') {
 		if (!add_block_to_expression(s->current_expr, new_block(MUL, value, *layer)))
 			return (false);
 	}
-	else if (line[*i] == '+'){
+	else if (line[*i] == '+') {
 		if (!add_block_to_expression(s->current_expr, new_block(ADD, value, *layer)))
 			return (false);
 	}
-	else if (line[*i] == '-'){ if (!add_block_to_expression(s->current_expr, new_block(SUB, value, *layer)))
+	else if (line[*i] == '-') {
+		if (!add_block_to_expression(s->current_expr, new_block(SUB, value, *layer)))
 			return (false);
 	}
-	else if (line[*i] == '^'){
+	else if (line[*i] == '^') {
 		if (!add_block_to_expression(s->current_expr, new_block(POWER, value, *layer)))
 			return (false);
 	}
@@ -441,10 +445,41 @@ bool get_symbol(int *layer, int *i, struct scope *s, char *line){
 //bool is variable() -> getValue de la def_list // faire une fonciton is variable [a-z][A-Za-z_]*
 //Recup l'index du debut et de la fin pour cree le nom de la variable a passer a get_value_from_variable(s)
 
+bool	get_parentheses(int *layer, int *i, struct scope *s, char *line){
+	s->current_expr->wasParenthese = true;
+	if (!parse_current_expr(s, line, *i, *layer)){
+		return (false);
+	}
+	(*layer)--;
+	(*i)++;
+	s->current_expr->maxLayer -= 1;
+	s->current_expr->wasParenthese = true;
+	return (true);
+}
 
-bool	parse_current_expr(struct scope *s, char *line){
-	int i = 0;
-	int layer = 0;
+bool getValFromVar(int *layer, int *i, struct scope *s, char *line){
+	float value;
+
+	int start = *i;
+	while (line[*i] && isvar(line[*i])){
+		(*i)++;
+	}
+	char *name = strndup(line, *i - start);
+	printf("this is a var we search for |%s|\n", name);
+	if (!get_var_from_def_list(s, name, &value))
+	{
+		free(name);
+		return (false);
+	}
+	free(name);
+	if (!add_block_to_expression(s->current_expr, new_block(VAL, value, *layer)))
+		return (false);
+	s->current_expr->wasVar = true;
+	return (true);
+}
+
+
+bool	parse_current_expr(struct scope *s, char *line, int i, int layer){
 
 	while (line[i]) {
 		if (line[i] == ';')
@@ -455,6 +490,7 @@ bool	parse_current_expr(struct scope *s, char *line){
 		}
 		if (isdigit(line[i])) {
 			s->current_expr->wasSymbol = false;
+			s->current_expr->wasParenthese = false;
 			if (s->current_expr->wasNumber || !get_val(&layer, &i, s, line))
 				return (false);
 			s->current_expr->wasVar = false;
@@ -463,24 +499,68 @@ bool	parse_current_expr(struct scope *s, char *line){
 		if (issymbol(line[i])) {
 			s->current_expr->wasNumber = false;
 			s->current_expr->wasVar = false;
-			if (s->current_expr->wasSymbol || !get_symbol(&layer, &i, s, line)) {
+			if (s->current_expr->wasParenthese \
+			|| s->current_expr->wasSymbol \
+			|| !get_symbol(&layer, &i, s, line)) {
 				return (false);
 			}
 			s->current_expr->wasSymbol = true;
 			continue ;
 		}
-		if (line[i] == '(') {
-			while (line[i] && line [i] != ')') {
-				i++;
+		if (isvar(line[i])){
+			s->current_expr->wasSymbol = false;
+			s->current_expr->wasParenthese = false;
+			if (s->current_expr->wasVar \
+			|| s->current_expr->wasNumber \
+			|| !getValFromVar(&layer, &i, s, line)){
+				
 			}
+		}
+		if (line[i] == '(') {
 			layer++;
+			s->current_expr->maxLayer += 1;
+			if (!get_parentheses(&layer, &i, s, line)) {
+				return (false);
+			}
 			continue ;
+		}
+		if (layer > 0){
+			if (line[i] == ')' && s->current_expr->maxLayer <= layer){
+				return (true);
+			}
+			return (false);
 		}
 		i++;
 	}
-	if (line[i] != ';')
+	if (line[i] != ';' || layer > 0 || s->current_expr->maxLayer > 0)
 		return (false);
 	return (true);
+}
+
+bool doAssignement(struct parser *p, struct capture_list *node, struct scope *s)
+{
+	char *var_name;
+	char *line;
+
+	p->current_pos = node->begin;
+	if (read_var(p)) {
+		var_name = get_var_name(p, node, p->current_pos - node->begin);
+		printf("we have a var %s\n", var_name);
+
+		line = get_value(p, node);
+
+		if (!parse_current_expr(s, line, 0, 0))
+		{
+			free(line);
+			return (false);
+		}
+		int value = 0; //Do calc -> make ast etc
+		//stor the result in value
+		push_to_def(s, var_name, value);
+		free(line);
+		return (true);
+	}
+	return (false);
 }
 
 
@@ -508,16 +588,11 @@ int     my_calc(struct parser *p, struct scope *s) {
 		printf("idx : %i expr : %s\n", i, get_value(p, node));
 		if (is_value(p)) {
 			s->current_val = atoi(&p->content[node->begin]);
-			printf("idx : %i expr : %s\n", i, get_value(p, node));
+			//printf("idx : %i expr : %s\n", i, get_value(p, node));
 			i++;
 			continue ;
 		}
-		/*
-		if (isAssignment(p, pos)){ --> node begin ensuite parse current expr
-			printf("This is assignment ->\n");
-			p->current_pos = node->begin;
-			doAssignement(p, node, s);
-		}*/
+		p->current_pos = node->begin;
 
 		s->current_expr = calloc(1, sizeof(t_expression));
 		if (!s->current_expr)
@@ -525,10 +600,31 @@ int     my_calc(struct parser *p, struct scope *s) {
 		s->current_expr->wasNumber = false;
 		s->current_expr->wasSymbol = false;
 		s->current_expr->wasVar = false;
+		s->current_expr->wasParenthese = false;
+		s->current_expr->maxLayer = 0;
 
 		char *line = get_value(p, node);
 
-		if (!parse_current_expr(s, line))
+		if (isAssignment(p)){
+			printf("This is assignment ->\n");
+			p->current_pos = node->begin;
+			doAssignement(p, node, s);
+			i++;
+
+			t_block *buf;
+
+			buf = s->current_expr->head;
+			while (buf) {
+				printf("type : %i value : %f\n", buf->type, buf->value);
+				buf = buf->next;
+			}
+			free(line);
+			free(s->current_expr);
+
+			continue ;
+		}
+
+		if (!parse_current_expr(s, line, 0, 0))
 			return (false);
 		/*
 		if (is_expression(p)) {
@@ -537,8 +633,15 @@ int     my_calc(struct parser *p, struct scope *s) {
 				return (false);
 			printf("This is expression ->\n");
 		}*/
-		printf("idx : %i expr : %s\n", i, get_value(p, node));
+//		printf("idx : %i expr : %s\n", i, get_value(p, node));
 		i++;
+		t_block *buf;
+
+		buf = s->current_expr->head;
+		while (buf) {
+			printf("type : %i value : %f\n", buf->type, buf->value);
+			buf = buf->next;
+		}
 		free(line);
 		free(s->current_expr);
 	}
@@ -553,7 +656,7 @@ int main()
 	//p = new_parser("(2 + 3 * 2 --+- 5) ^ 5 / 3 ;")
 	if (my_calc(p, &s))
 	{
-		fprintf(stderr, "current value : %li\n", s.current_val);
+		fprintf(stderr, "current value : %f\n", s.current_val);
 		//if (s.current_val != 12)
 		//	fprintf(stderr, "Erreur de calcul %ld\n", s.current_val);
 	}
