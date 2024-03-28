@@ -1,8 +1,4 @@
 #include "my_calc.h"
-#include <errno.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 /* ITOA CODE */
 static int	ft_power_static(int nb, int power)
@@ -69,41 +65,70 @@ char	*ft_itoa(int n)
 
 /* USEFUL */
 
-t_block *new_block(t_leaf_type type, char *content, int layer){
-	t_block *new_block = malloc(sizeof(t_block));
+t_block *new_block(t_leaf_type type, int value, int layer){
+	t_block *block = malloc(sizeof(t_block));
 
-	if (!new_block) {
+	if (!block) {
 		return (NULL);
 	}
 
-	new_block->type = type;
-	new_block->content = content;
-	new_block->next = NULL;
-	new_block->layer = layer;
-	return (new_block);
+	block->type = type;
+	block->next = NULL;
+	block->layer = layer;
+	block->value = value;
+	return (block);
 }
 
 bool	add_block_to_expression(t_expression *expr, t_block *new_block){
+	if (!new_block || !expr)
+		return (false);
 	if (!expr->head){
 		expr->head = new_block;
+		expr->size = 1;
+		return (true);
 	}
-	expr->next = new_block;
+	t_block *buf;
+	buf = expr->head;
+	while (buf->next){
+		buf = buf->next;
+	}
+	buf->next = new_block;
 	expr->size += 1;
+	return (true);
 }
 
 
-int                    count_expression(struct parser *p)
-{
-    int count = 0;
-    for (int idx = 0; p->content[idx] != '\0'; idx += 1)
-    {
-        if (p->content[idx] == ';')
-        {
-			count++;
-        }
-    }
-	return (count);
+t_leaf *new_leaf(t_content *content, t_leaf_type type){
+	(void) content;
+	t_leaf *leaf = calloc(1, sizeof(t_leaf));
+	if (!leaf){
+		return (NULL);
+	}
+	leaf->type = type;
+	leaf->right = NULL;
+	leaf->left = NULL;
+	return (leaf);
 }
+
+bool push_to_def(struct scope *s, char *name, int value){
+	(void) s;
+	struct def_list *var = calloc(1, sizeof(struct def_list));
+	if (!var){
+		return (false);
+	}
+
+	var->name = name;
+	var->val = value;
+	var->next = NULL;
+	return true;
+}
+
+//Get from def variable
+
+/* END OF USEFUL */
+
+
+/* READ_XXX */
 
 int                     read_int(struct parser *p)
 {
@@ -118,7 +143,6 @@ int                     read_int(struct parser *p)
 	//printf("False from read_ind\n");
 	return (false);
 }
-
 
 int read_basic_symbol(struct parser *p){
 	int save = p->current_pos;
@@ -173,7 +197,7 @@ int read_space(struct parser *p){
 	}
 	else{
 		p->current_pos = save;
-		//printf("False from read_space\n");
+//		printf("False from read_space %c\n", p->content[p->current_pos]);
 		return (false);
 	}
 }
@@ -215,6 +239,21 @@ int read_expression(struct parser *p, char *idx){
 	return (false);
 }
 
+/* END READ_XXX */
+
+int                    count_expression(struct parser *p)
+{
+    int count = 0;
+    for (int idx = 0; p->content[idx] != '\0'; idx += 1)
+    {
+        if (p->content[idx] == ';')
+        {
+			count++;
+        }
+    }
+	return (count);
+}
+
 int parse(struct parser *p, int nb_expression){
 	int i = 0;
 
@@ -226,19 +265,6 @@ int parse(struct parser *p, int nb_expression){
 		i++;
 	}
 	return (true);
-}
-
-bool push_to_def(struct scope *s, char *name, int value){
-	(void) s;
-	struct def_list *var = calloc(1, sizeof(struct def_list));
-	if (!var){
-		return (false);
-	}
-
-	var->name = name;
-	var->val = value;
-	var->next = NULL;
-	return true;
 }
 
 char *get_var_name(struct parser *p, const struct capture_list *node, int size){
@@ -292,6 +318,7 @@ bool is_expression(struct parser *p) {
 
 bool doAssignement(struct parser *p, struct capture_list *node, struct scope *s)
 {
+	(void) s;
 	char *var_name;
 
 	p->current_pos = node->begin;
@@ -321,6 +348,7 @@ bool doAssignement(struct parser *p, struct capture_list *node, struct scope *s)
 	return (false);
 }
 
+/*
 bool doCalc(struct parser *p, struct capture_list *node, struct scope *s){
 
 	int value = 0;
@@ -330,8 +358,8 @@ bool doCalc(struct parser *p, struct capture_list *node, struct scope *s){
 
 		}
 	}
-}
-
+}*/
+/*
 bool ast(struct scope *s, struct capture_list *node, int pos){
 	//Browser util find a value
 	if (s->expression[pos] <= '9' && s->expression[pos] >= '0'){
@@ -341,18 +369,8 @@ bool ast(struct scope *s, struct capture_list *node, int pos){
 	if (!ast(p, s, pos)){
 		return (false);
 	}
-}
+}*/
 
-t_leaf *new_leaf(t_content *content, t_leaf_type type){
-	t_leaf *new_leaf = calloc(1, sizeof(t_leaf));
-	if (!new_leaf){
-		return (NULL);
-	}
-	t_leaf->type = type;
-	leaf->right = NULL;
-	leaf->left = NULL;
-	
-}
 
 bool isparentheses(char a){
 	if (a == '(' || a == ')')
@@ -361,22 +379,64 @@ bool isparentheses(char a){
 }
 
 bool issymbol(char a){
-	if (a == '/' || a == '+' || a == '-' || a == '^' || a == '%')
+	if (a == '/' || a == '+' || a == '-' || a == '^' || a == '%' || a == '*')
 		return (true);
 	return (false);
 }
 
 bool isValidNextToNumber(char a){
-	if (issymbol(a) || isspace(a))
+	if (issymbol(a) || isspace(a) || a == ';')
 		return (true);
 	return (false);
 }
 
-bool get_value(int &layer, int &i);
+bool get_val(int *layer, int *i, struct scope *s, char *line) {
+	float value = atof(&line[*i]);
+	while (line[*i] && isdigit(line[*i])){
+		(*i)++;
+	}
+	if (line[*i] == '.'){
+		(*i)++;
+	}
+	if (line[*i] && isdigit(line[*i])) {
+		while (line[*i] && isdigit(line[*i])) {
+			(*i)++;
+		}
+	}
+	if (line[*i] && !isValidNextToNumber(line[*i]))
+		return (false);
+	if (!add_block_to_expression(s->current_expr, new_block(VAL, value, *layer)))
+		return (false);
+	s->current_expr->wasNumber = true;
+	return (true);
+}
 
-bool get_symbol(int &layer, int &i);
+bool get_symbol(int *layer, int *i, struct scope *s, char *line){
+	float value = INT_MIN;
+	if (line[*i] == '/'){
+		if (!add_block_to_expression(s->current_expr, new_block(DIV, value, *layer)))
+			return (false);
+	}
+	else if (line[*i] == '*'){
+		if (!add_block_to_expression(s->current_expr, new_block(MUL, value, *layer)))
+			return (false);
+	}
+	else if (line[*i] == '+'){
+		if (!add_block_to_expression(s->current_expr, new_block(ADD, value, *layer)))
+			return (false);
+	}
+	else if (line[*i] == '-'){ if (!add_block_to_expression(s->current_expr, new_block(SUB, value, *layer)))
+			return (false);
+	}
+	else if (line[*i] == '^'){
+		if (!add_block_to_expression(s->current_expr, new_block(POWER, value, *layer)))
+			return (false);
+	}
+	(*i)++;
+	return (true);
+}
 
-bool get_parentheses(int &layer, int &i); //celle-ci pepite //rappeller is digit et isymbol
+//bool get_parentheses(int &layer, int &i); //celle-ci pepite //rappeller is digit et isymbol
 
 //bool is variable() -> getValue de la def_list // faire une fonciton is variable [a-z][A-Za-z_]*
 //Recup l'index du debut et de la fin pour cree le nom de la variable a passer a get_value_from_variable(s)
@@ -386,62 +446,41 @@ bool	parse_current_expr(struct scope *s, char *line){
 	int i = 0;
 	int layer = 0;
 
-//s->current_expr
-
-	while (line[i]){
+	while (line[i]) {
 		if (line[i] == ';')
 			break ;
-
-		if (isdigit(line[i])){
-			value = atof(line[i]);
-			while (line[i] && isdigit(line[i])){
-				i++;
-			}
-			if (line[i] == '.'){
-				i++;
-			}
-			if (line[i] && isdigit(line[i])){
-				while (line[i] && isdigit(line[i])){
-					i++;
-				}
-			}
-			if (line[i] && !isValidNextToNumber(line[i]))
-				return (false);
-			//New block val = value
+		if ((line[i] >= 9 && line[i] <= 13) || line[i] == ' ') {
+			i++;
 			continue ;
 		}
-		if (issymbol(line[i])){
-			if (line[i] == '/'){
-				//new block division
-			}
-			if (line[i] == '*'){
-				//new block division
-			}
-			if (line[i] == '+'){
-				//new block division
-			}
-			if (line[i] == '-'){
-				//new block division
-			}
-			if (line[i] == '^'){
-				//new block power
-			}
+		if (isdigit(line[i])) {
+			s->current_expr->wasSymbol = false;
+			if (s->current_expr->wasNumber || !get_val(&layer, &i, s, line))
+				return (false);
+			s->current_expr->wasVar = false;
+			continue ;
 		}
-		if (line[i] == '('){
-			while (line[i] && line [i] != ')'){
+		if (issymbol(line[i])) {
+			s->current_expr->wasNumber = false;
+			s->current_expr->wasVar = false;
+			if (s->current_expr->wasSymbol || !get_symbol(&layer, &i, s, line)) {
+				return (false);
+			}
+			s->current_expr->wasSymbol = true;
+			continue ;
+		}
+		if (line[i] == '(') {
+			while (line[i] && line [i] != ')') {
 				i++;
 			}
 			layer++;
-			continue ;
-		}
-		if ((line[i] >= 9 && line[i] <= 13) || line[i] == ' '){
-			i++;
 			continue ;
 		}
 		i++;
 	}
 	if (line[i] != ';')
 		return (false);
+	return (true);
 }
 
 
@@ -458,14 +497,15 @@ int     my_calc(struct parser *p, struct scope *s) {
 	int i = 0;
 
 	s->tree = calloc(1, sizeof(t_leaf));
-	s->tree->head = true;
 	if (!s->tree)
 		return (false);
+	s->tree->head = true;
 
 	while (i < nb_expression) {
 		struct capture_list *node = get_node(p, ft_itoa(i));
 
 		p->current_pos = node->begin;
+		printf("idx : %i expr : %s\n", i, get_value(p, node));
 		if (is_value(p)) {
 			s->current_val = atoi(&p->content[node->begin]);
 			printf("idx : %i expr : %s\n", i, get_value(p, node));
@@ -482,17 +522,21 @@ int     my_calc(struct parser *p, struct scope *s) {
 		s->current_expr = calloc(1, sizeof(t_expression));
 		if (!s->current_expr)
 			return (false);
+		s->current_expr->wasNumber = false;
+		s->current_expr->wasSymbol = false;
+		s->current_expr->wasVar = false;
 
 		char *line = get_value(p, node);
 
 		if (!parse_current_expr(s, line))
 			return (false);
+		/*
 		if (is_expression(p)) {
 			fill_expression
 			if (!ast(s, node, node->begin))
 				return (false);
 			printf("This is expression ->\n");
-		}
+		}*/
 		printf("idx : %i expr : %s\n", i, get_value(p, node));
 		i++;
 		free(line);

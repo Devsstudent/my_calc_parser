@@ -3,6 +3,11 @@
 #include "my_parser.h"
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <limits.h>
 
 typedef enum leaf_type {
 	ADD,
@@ -15,15 +20,18 @@ typedef enum leaf_type {
 }	t_leaf_type;
 
 typedef struct block {
-	t_leaf_type	type;
-	char *		content; //Set to null on operand
-	int			layer;
-	t_block		*next;
+	t_leaf_type		type;
+	int				layer;
+	float			value;
+	struct block	*next;
 }	t_block;
 
 typedef struct expression {
 	t_block		*head;
 	int			size;
+	bool		wasNumber;
+	bool		wasSymbol;
+	bool		wasVar;
 }	t_expression;
 
 typedef struct content {
@@ -52,7 +60,7 @@ struct scope
     long int            current_val;
 	struct leaf			*tree;
 	t_expression		*current_expr;
-}
+};
 
 
 int     my_calc(struct parser *p, struct scope *s);
