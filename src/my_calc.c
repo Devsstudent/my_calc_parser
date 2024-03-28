@@ -136,13 +136,13 @@ bool push_to_def(struct scope *s, char *name, float value){
 
 bool get_var_from_def_list(struct scope *s, char *name, float *gotVal){
 
-	if (!s){
+	if (!s) {
 		return (false);
 	}
 	struct def_list *buf = s->defs;
 
-	while (buf){
-		if (strcmp(buf->name, name) == 0){
+	while (buf) {
+		if (strcmp(buf->name, name) == 0) {
 			*gotVal = buf->val;
 			return (true);
 		}
@@ -162,10 +162,13 @@ int                     read_int(struct parser *p)
 {
 	int save = p->current_pos;
 	while (read_space(p)){}
-	if (readrange(p, '0', '9')){
-    	while (readrange(p, '0', '9')){
-    	}
-    	return (1);
+	
+	if (readint(p)){
+    	return (true);
+	}
+	p->current_pos = save;
+	if (readfloat(p)){
+		return (true);
 	}
 	p->current_pos = save;
 	//printf("False from read_ind\n");
@@ -244,19 +247,20 @@ int read_var(struct parser *p){
 	}
 }
 
+int read_num_or_var(struct parser *p){
+	if (read_var(p) || read_int(p)){
+		return (true);
+	}
+	return (false);
+}
+
 int read_expression(struct parser *p, char *idx){
 	if (!begin_capture(p, idx))
 	{
 		return (false);
 	}
-	while(read_int(p) \
-		|| read_var(p) \
-		|| read_basic_symbol(p) \
-		|| read_priority_symbol(p) \
-		|| read_assign_symbol(p) \
-		|| read_space(p))
-	{
-	}
+	while (p->content[p->current_pos]  && p->content[p->current_pos] != ';')
+		p->current_pos += 1;
 	if (read_end_symbol(p)){
 		if (!end_capture(p, idx))
 		{
@@ -446,14 +450,15 @@ bool get_symbol(int *layer, int *i, struct scope *s, char *line){
 //Recup l'index du debut et de la fin pour cree le nom de la variable a passer a get_value_from_variable(s)
 
 bool	get_parentheses(int *layer, int *i, struct scope *s, char *line){
-	s->current_expr->wasParenthese = true;
-	if (!parse_current_expr(s, line, *i, *layer)){
+	s->current_expr->wasOpenParenthese = true;
+	(*i)++;
+	if (!parse_current_expr(s, line, i, layer)){
 		return (false);
 	}
 	(*layer)--;
 	(*i)++;
 	s->current_expr->maxLayer -= 1;
-	s->current_expr->wasParenthese = true;
+	s->current_expr->wasCloseParenthese = true;
 	return (true);
 }
 
@@ -479,60 +484,65 @@ bool getValFromVar(int *layer, int *i, struct scope *s, char *line){
 }
 
 
-bool	parse_current_expr(struct scope *s, char *line, int i, int layer){
+bool	parse_current_expr(struct scope *s, char *line, int *i, int *layer){
 
-	while (line[i]) {
-		if (line[i] == ';')
+	while (line[*i]) {
+		if (line[*i] == ';')
 			break ;
-		if ((line[i] >= 9 && line[i] <= 13) || line[i] == ' ') {
-			i++;
+		if ((line[*i] >= 9 && line[*i] <= 13) || line[*i] == ' ') {
+			(*i)++;
 			continue ;
 		}
-		if (isdigit(line[i])) {
+		if (isdigit(line[*i])) {
 			s->current_expr->wasSymbol = false;
-			s->current_expr->wasParenthese = false;
-			if (s->current_expr->wasNumber || !get_val(&layer, &i, s, line))
+			s->current_expr->wasOpenParenthese = false;
+			if (s->current_expr->wasCloseParenthese || s->current_expr->wasNumber || !get_val(layer, i, s, line))
 				return (false);
 			s->current_expr->wasVar = false;
 			continue ;
 		}
-		if (issymbol(line[i])) {
+		if (issymbol(line[*i])) {
 			s->current_expr->wasNumber = false;
 			s->current_expr->wasVar = false;
-			if (s->current_expr->wasParenthese \
+			s->current_expr->wasCloseParenthese = false;
+			if (s->current_expr->wasOpenParenthese \
 			|| s->current_expr->wasSymbol \
-			|| !get_symbol(&layer, &i, s, line)) {
+			|| !get_symbol(layer, i, s, line)) {
 				return (false);
 			}
 			s->current_expr->wasSymbol = true;
 			continue ;
 		}
-		if (isvar(line[i])){
+		if (line[*i] && isvar(line[*i])){
 			s->current_expr->wasSymbol = false;
-			s->current_expr->wasParenthese = false;
-			if (s->current_expr->wasVar \
+			s->current_expr->wasCloseParenthese = false;
+			if (s->current_expr->wasOpenParenthese  \
+			|| s->current_expr->wasVar \
 			|| s->current_expr->wasNumber \
-			|| !getValFromVar(&layer, &i, s, line)){
-				
+			|| !getValFromVar(layer, i, s, line)){
+				return (false);
 			}
+			(*i)++;
+			continue;
 		}
-		if (line[i] == '(') {
-			layer++;
+		if (line[*i] == '(') {
+			(*layer)++;
 			s->current_expr->maxLayer += 1;
-			if (!get_parentheses(&layer, &i, s, line)) {
+			if (s->current_expr->wasSymbol && !get_parentheses(layer, i, s, line)) {
 				return (false);
 			}
 			continue ;
 		}
 		if (layer > 0){
-			if (line[i] == ')' && s->current_expr->maxLayer <= layer){
+			s->current_expr->wasOpenParenthese = false;
+			if (line[*i] == ')' && s->current_expr->maxLayer <= *layer){
 				return (true);
 			}
 			return (false);
 		}
-		i++;
+		(*i)++;
 	}
-	if (line[i] != ';' || layer > 0 || s->current_expr->maxLayer > 0)
+	if (line[*i] != ';' || *layer > 0 || s->current_expr->maxLayer > 0)
 		return (false);
 	return (true);
 }
@@ -549,7 +559,9 @@ bool doAssignement(struct parser *p, struct capture_list *node, struct scope *s)
 
 		line = get_value(p, node);
 
-		if (!parse_current_expr(s, line, 0, 0))
+		int idx = 0;
+		int layer = 0;
+		if (!parse_current_expr(s, line, &idx, &layer))
 		{
 			free(line);
 			return (false);
@@ -600,7 +612,8 @@ int     my_calc(struct parser *p, struct scope *s) {
 		s->current_expr->wasNumber = false;
 		s->current_expr->wasSymbol = false;
 		s->current_expr->wasVar = false;
-		s->current_expr->wasParenthese = false;
+		s->current_expr->wasCloseParenthese = false;
+		s->current_expr->wasOpenParenthese = false;
 		s->current_expr->maxLayer = 0;
 
 		char *line = get_value(p, node);
@@ -624,7 +637,9 @@ int     my_calc(struct parser *p, struct scope *s) {
 			continue ;
 		}
 
-		if (!parse_current_expr(s, line, 0, 0))
+		int idx = 0;
+		int layer = 0;
+		if (!parse_current_expr(s, line, &idx, &layer))
 			return (false);
 		/*
 		if (is_expression(p)) {
@@ -651,7 +666,7 @@ int     my_calc(struct parser *p, struct scope *s) {
 int main()
 { //...
 	struct scope s;
-	struct parser *p = new_parser("12/125*9000;12313 + 2600 - 36;a = 12 - 12 + 2;a = a + 3; 				123123123;");
+	struct parser *p = new_parser("12/( 125 + 24  - 15 )*9000;12313 + 2600 - 36;a = 12 - 12 + 2;a = a + 3; 				123123123;");
 
 	//p = new_parser("(2 + 3 * 2 --+- 5) ^ 5 / 3 ;")
 	if (my_calc(p, &s))
