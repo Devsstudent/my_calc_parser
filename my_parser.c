@@ -1,10 +1,21 @@
 #include "my_parser.h"
-#define _POSIX_C_SOURCE 202404L
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+# define LOG(...) fprintf(stderr, __VA_ARGS__);
 
-#define LOG(...) fprintf(stderr, __VA_ARGS__);
+
+char *my_strndup(const char *str, size_t n) {
+    size_t len = strlen(str);
+    if (n < len) {
+        len = n;
+    }
+    char *copy = malloc(len + 1);
+    if (copy == NULL) {
+        return NULL;
+    }
+    strncpy(copy, str, len);
+    copy[len] = '\0';
+    return copy;
+}
+
 
 struct parser           *new_parser(const char *content)
 {
@@ -116,10 +127,14 @@ int                     readtext(struct parser *p, char *text)
 // [0-9]+
 int                     readint(struct parser *p)
 {
-    while (readrange(p, '0', '9')){
+	if (p->content[p->current_pos] && isdigit(p->content[p->current_pos])){
 
-    }
-    return (1);
+    	while (readrange(p, '0', '9')){
+
+    	}
+    	return (1);
+	}
+	return (0);
 }
 
 // [a-zA-Z_][a-zA-Z_0-9]*
@@ -258,13 +273,16 @@ struct capture_list	*get_node(struct parser *p, const char *node_name)
 
 char                    *get_value(struct parser *p, const struct capture_list *node)
 {
-    char *res = strndup(&p->content[node->begin], node->end - node->begin);
+    char *res = my_strndup(&p->content[node->begin], node->end - node->begin);
     return res;
 }
 
 int                     begin_capture(struct parser *p, const char *tagname)
 {
     struct capture_list *item = calloc(1, sizeof (*item));
+	if (!item){
+		return (0);
+	}
     item->prev = p->nodes;
     p->nodes = item;
     item->name = tagname;

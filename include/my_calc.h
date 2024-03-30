@@ -1,7 +1,8 @@
 #ifndef _MY_CALC_H
-#define _MY_CALC_H
-#include "my_parser.h"
-#include <stdbool.h>
+# define _MY_CALC_H
+# include "my_parser.h"
+# include <stdbool.h>
+# include <error.h>
 
 struct def_list
 {
@@ -18,5 +19,6 @@ struct scope
 
 int     my_calc(struct parser *p, struct scope *s);
 bool	expression(struct parser *p, struct scope *s);
+bool	read_var_name(struct parser *p);
 
-#endif  
+#endif

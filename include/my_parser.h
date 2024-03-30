@@ -1,9 +1,9 @@
 #ifndef _MY_PARSER_H
-#define _MY_PARSER_H
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h> // for isspace()
+# define _MY_PARSER_H
+# include <stdio.h>
+# include <stdlib.h>
+# include <string.h>
+# include <ctype.h>
 
 struct capture_list
 {
@@ -99,6 +99,7 @@ int readProduct(struct parser *p);
 int readPower(struct parser *p);
 int readValue(struct parser *p);
 int readNumber(struct parser *p);
+char *my_strndup(const char *str, size_t n);
 
 
 #endif /* _MY_PARSER_H */

@@ -1,0 +1,8 @@
+Expr             ← Sum
+Sum              ← Product (('+' / '-') Product)*
+Product          ← Power (('*' / '/') Power)*
+Power            ← Value ('^' Power)?
+Value            ← Variable / Number / '(' Expr ')'
+Variable         ← [a-zA-Z_]+ '=' Expr / [a-zA-Z]+
+Number           ← [0-9]+
+SPACE_OR_COMMENT ← '//' [^\n]* '\n' / [ \t\r\n]+
