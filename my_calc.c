@@ -123,6 +123,7 @@ void skip_spaces_or_comments(struct parser *p) {
 		}
 		return ;
 	}
+	p->current_pos = save;
 	if (p->content[p->current_pos] && isspace(p->content[p->current_pos])) {
 		while (p->content[p->current_pos] && isspace(p->content[p->current_pos])) {
 			p->current_pos += 1;
@@ -225,6 +226,7 @@ bool	value(struct parser *p, struct scope *s){
 	skip_spaces_or_comments(p);
 	//begin capture
 	if (isdigit(p->content[p->current_pos])){
+		s->lionel = true;
 		if (begin_capture(p, "val") && readint(p) && end_capture(p, "val")){
 			struct capture_list *node = get_node(p, "val");
 			if (!node)
@@ -341,7 +343,7 @@ int     my_calc(struct parser *p, struct scope *s) {
 	s->defs = NULL;
 	bool comment = false;
 	while (p->content[p->current_pos]){
-		printf("AH :%c\n", p->content[p->current_pos]);
+		s->lionel = false;
 		int save = p->current_pos;
 		if (readtext(p, "//")) {
 			comment = true;
@@ -354,17 +356,20 @@ int     my_calc(struct parser *p, struct scope *s) {
 			}
 			return (false);
 		}
-		printf("AHAH%i\n", comment);
+		skip_spaces_or_comments(p);
+		if (!s->lionel && !p->content[p->current_pos + 1]){
+			return (true);
+		}
 		if (!readchar(p, ';') && !comment)
 			return (false);
 	}
 	return (true);
 }
-
+/*
 int main()
 { //...
 	struct scope s;
-	struct parser *p = new_parser("a = -(5 +- 2)-2^(-(4 + 4));12 + a;b=14+a;b//this a comment\n;a=2;a;//this a comment bitches\n        \n 		 \n\n\n        \r\t\t\t\t\t             //asjdkasjd \n //Bruh");
+	struct parser *p = new_parser("  14  \t  \n/ \n2 \n; \n");
 	if (my_calc(p, &s))
 	{
 		printf("no fail, current : %li\n", s.current_val);
@@ -388,4 +393,4 @@ int main()
 			fprintf(stderr, " ");
 		fprintf(stderr, "^\n");
 	}
- }
+ }*/

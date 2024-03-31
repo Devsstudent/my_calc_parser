@@ -1,4 +1,5 @@
 #include "my_parser.h"
+#include "my_calc.h"
 #include <criterion/criterion.h>
 #include <stdio.h>
 
@@ -22,176 +23,258 @@ int     read_test(struct parser *p)
     return 0;
 }
 
-Test(my, check_parsing1)
+Test(my, check_calc_int)
 {
     struct parser *p;
-    struct position pos;
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("");
-        if (!(readeof(p) && p->current_pos == 0))
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("abc");
-        if (!readchar(p, 'a') || p->current_pos != 1)
-            break;
-        if (!readchar(p, 'b') || p->current_pos != 2)
-            break;
-        if (!readchar(p, 'c') || p->current_pos != 3)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("abc");
-        if (!readrange(p, 'a', 'c') || p->current_pos != 1)
-            break;
-        if (!readrange(p, 'a', 'c') || p->current_pos != 2)
-            break;
-        if (!readrange(p, 'a', 'c') || p->current_pos != 3)
-            break;
-        if (readrange(p, 'a', 'c'))
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("abcdef");
-        if (!readtext(p, "abc") || p->current_pos != 3)
-            break;
-        if (!readtext(p, "def") || p->current_pos != 6)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("123");
-        if (!readint(p) || p->current_pos != 3)
-            break;
-        clean_parser(p);
-        p = new_parser("123tuju");
-        if (!readint(p) || p->current_pos != 3)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("id_12");
-        if (!readid(p) || p->current_pos != 5)
-            break;
-        clean_parser(p);
-        p = new_parser("id_12 ");
-        if (!readid(p) || p->current_pos != 5)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("12.");
-        if (!readfloat(p) || p->current_pos != 3)
-            break;
-        clean_parser(p);
-        p = new_parser("-2.2");
-        if (!readfloat(p) || p->current_pos != 4)
-            break;
-        clean_parser(p);
-        p = new_parser("+2.2");
-        if (!readfloat(p) || p->current_pos != 4)
-            break;
-        clean_parser(p);
-        p = new_parser(".2600");
-        if (!readfloat(p) || p->current_pos != 5)
-            break;
-        clean_parser(p);
-        p = new_parser(".26e+12");
-        if (!readfloat(p) || p->current_pos != 7)
-            break;
-        clean_parser(p);
-        p = new_parser(".26e-11");
-        if (!readfloat(p) || p->current_pos != 7)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("line1\nline2 avec plus de contenu\nici");
-        if (!readtext(p, "line1\n"))
-            break;
-        count_lines(p, &pos);
-        if (pos.line != 2 || pos.col != 1)
-            break;
-        if (!readtext(p, "line2 avec plus de contenu\n"))
-            break;
-        count_lines(p, &pos);
-        if (pos.line != 3 || pos.col != 1)
-            break;
-        if (!readtext(p, "ici"))
-            break;
-        count_lines(p, &pos);
-        if (pos.line != 3 || pos.col != 4)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("12+$a;");
-        if (read_test(p))
-            break;
-        char *sub = get_line_error(p);
-        if (strcmp(sub, "12+$a;"))
-            break;
-        free(sub);
-        count_lines(p, &pos);
-        if (pos.line != 1 || pos.col != 4)
-            break;
-        clean_parser(p);
-        break;
-    }
-    //
-    while (2600)
-    {
-        //////
-        p = new_parser("12abcd");
-        if (!(begin_capture(p, "val") && readint(p) && begin_capture(p, "val2") && readid(p) && end_capture(p, "val2") && end_capture(p, "val")))
-            break;
-        char *sub = get_value(p, get_node(p, "val2"));
-        if (strcmp(sub, "abcd"))
-            break;
-        free(sub);
-        sub = get_value(p, get_node(p, "val"));
-        if (strcmp(sub, "12abcd"))
-            break;
-        free(sub);
-        clean_parser(p);
-        break;
-    }
+    struct scope s;
+
+    p = new_parser("12;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 12);
+    clean_parser(p);
 }
+
+Test(my, check_calc_int_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  12  \n  \n;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 12);
+    clean_parser(p);
+}
+
+Test(my, check_calc_product)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("14*2;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 28);
+    clean_parser(p);
+}
+
+Test(my, check_calc_product_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  14  \t  \n* \n2 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 28);
+    clean_parser(p);
+}
+
+Test(my, check_calc_division)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("14 / 2;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 7);
+    clean_parser(p);
+}
+
+Test(my, check_calc_division_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  14  \t  \n/ \n2 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 7);
+    clean_parser(p);
+}
+
+Test(my, check_calc_modulo)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("14%8;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 6);
+    clean_parser(p);
+}
+
+Test(my, check_calc_modulo_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  14  \t  \n% \n8 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 6);
+    clean_parser(p);
+}
+
+Test(my, check_calc_sum)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("144+6;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 150);
+    clean_parser(p);
+}
+
+Test(my, check_calc_sum_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  144  \t  \n+ \n6 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 150);
+    clean_parser(p);
+}
+
+Test(my, check_calc_sub)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("144-6;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 138);
+    clean_parser(p);
+}
+
+Test(my, check_calc_sub_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  144  \t  \n- \n6 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 138);
+    clean_parser(p);
+}
+
+Test(my, check_calc_unary)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("-6;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == -6);
+    clean_parser(p);
+}
+
+Test(my, check_calc_unary_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser(" -6  \t  \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == -6);
+    clean_parser(p);
+}
+
+
+Test(my, check_calc_complex_with_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  144  \t  \n- -\n6 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 150);
+    clean_parser(p);
+}
+
+Test(my, check_calc_parenthesis_with_sum)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("(144+6);");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 150);
+    clean_parser(p);
+}
+
+Test(my, check_calc_priority)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("2+3*4;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 14);
+    clean_parser(p);
+}
+
+Test(my, check_calc_priority_with_parenthesis)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("(2+3)*4;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 20);
+    clean_parser(p);
+}
+
+Test(my, check_calc_priority_with_parenthesis_and_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("  6 \t  \n/ \n2 \n+ \n1 \n;  \n");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 4);
+    clean_parser(p);
+}
+
+Test(my, check_calc_variable)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("a=12; a;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 12);
+    clean_parser(p);
+}
+
+Test(my, check_calc_variable_with_expression)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("a = 1 + 2 * 3; a * 2;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 14);
+    clean_parser(p);
+}
+
+Test(my, check_calc_multi_variable_with_expression)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser(" a=(2+3) * 4; c=4; a*c;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 80);
+    clean_parser(p);
+}
+
+Test(my, check_calc_multi_variable_with_expression_and_spaces)
+{
+    struct parser *p;
+    struct scope s;
+
+    p = new_parser("a=2+1; 12-a \n;");
+    my_calc(p, &s);
+    cr_assert(s.current_val == 9);
+    clean_parser(p);
+}
+
+

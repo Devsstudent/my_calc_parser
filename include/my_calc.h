@@ -15,6 +15,7 @@ struct scope
 {
     struct def_list     *defs;
     long int            current_val;
+	bool				lionel;
 };
 
 int     my_calc(struct parser *p, struct scope *s);
